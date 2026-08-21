@@ -99,10 +99,8 @@ Three defaults are not arbitrary:
 ```bash
 python summarize_runs.py --data data/returns_clean.csv runs/final
 python novelty.py --data data/returns_clean.csv --runs runs/final
-python 06_compare.py --data data/returns_clean.csv --run runs/final --out fig/windows.png
+python 06_compare.py --data data/returns_clean.csv --run runs/final --dim 3
 ```
-
-`novelty.py` is the one that cannot be passed by memorisation; the others can.
 
 ## 7. Baselines
 
