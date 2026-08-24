@@ -102,6 +102,12 @@ python novelty.py --data data/returns_clean.csv --runs runs/final
 python 06_compare.py --data data/returns_clean.csv --run runs/final --dim 3
 ```
 
+## 6.2 See distributions
+
+```bash
+python 05_density.py --data data/returns_clean.csv runs/final
+```
+
 ## 7. Baselines
 
 ```bash
