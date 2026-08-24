@@ -203,7 +203,7 @@ def main():
             continue
         if flat.shape[1] != f:
             raise SystemExit(f"{p}: {flat.shape[1]} features, {a.data} has {f}")
-        label = os.path.basename(os.path.normpath(run)).replace(".npy", "")
+        label = "tailfm"
         gens[label] = prep(pool_rows(flat, a.max_points,
                                      np.random.default_rng(a.seed),
                                      width=len(cols)))
