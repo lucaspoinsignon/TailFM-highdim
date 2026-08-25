@@ -8,4 +8,7 @@ out.to_csv('data/returns_30.csv')
 print(out.shape, list(out.columns))
 "
 
+python check.py --data data/returns_30.csv
+python fit_returns.py --data data/returns_30.csv --outdir runs/f30
+
 ```
