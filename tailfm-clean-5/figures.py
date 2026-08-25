@@ -15,6 +15,10 @@ feature asks matplotlib for a canvas past its 2**16 px limit.  Pairs are ranked 
 |lambda_gen(q0) - lambda_real(q0)| at q0 = screen_q (one f x f indicator product per
 sample, so O(N f^2) once rather than per pair) and the per-feature grids show the
 `max_features` features with the heaviest empirical lower tail.
+
+That ranking maxes over models, so one saturated generator picks the panels for all of
+them; `pair_select` in tail_dependence_figure / save_all_figures switches to a random
+or lambda_real-stratified selection instead.  See tail_dependence_figure.
 """
 
 from __future__ import annotations
@@ -160,11 +164,24 @@ def qq_figure(real, gens, names, path, q_lo=0.001, q_hi=0.05, n_q=150,
 # --------------------------------------------------------- tail dependence
 def tail_dependence_figure(real, gens, names, path, q_grid=None, tail="lower",
                            max_pairs: int | None = MAX_PAIRS,
-                           screen_q: float = 0.05, max_rows: int = MAX_ROWS):
-    """lambda_L(q) = P(U_i < q, U_j < q) / q for the worst `max_pairs` pairs.
+                           screen_q: float = 0.05, max_rows: int = MAX_ROWS,
+                           pair_select: str = "worst", seed: int = 0):
+    """lambda_L(q) = P(U_i < q, U_j < q) / q for `max_pairs` selected pairs.
 
     Pairs are screened at a single q with one f x f indicator product; only the
-    survivors get full curves.
+    survivors get full curves.  `pair_select` decides which ones survive:
+
+        worst    largest |lambda_gen(q0) - lambda_real(q0)|, maxed over models.
+        random   a uniform sample of the f(f-1)/2 pairs.
+        spread   evenly spaced in lambda_real(q0), so the panels cover the whole
+                 range of real tail dependence rather than one end of it.
+
+    `worst` maximises the discrepancy OVER MODELS, so a single saturated
+    generator selects the panels for all of them: a mode-collapsed baseline emits
+    near-comonotone windows, lambda_gen(q) == 1 for almost every pair, and the
+    ranking then returns the least tail-dependent REAL pairs -- every panel shows
+    the same flat pair of lines.  Use `spread` whenever one model may be
+    degenerate, which is the normal case in run_baselines.py.
     """
     f = real.shape[-1]
     if f < 2:
@@ -183,7 +200,21 @@ def tail_dependence_figure(real, gens, names, path, q_grid=None, tail="lower",
     D = np.max([np.abs(_lambda_matrix(u, screen_q, tail) - lamR)
                 for u in uG.values()], axis=0)
     iu = np.triu_indices(f, k=1)
-    pairs = _worst(D[iu], list(zip(*iu)), max_pairs)
+    keys = list(zip(*iu))
+    n_keep = len(keys) if max_pairs is None else min(max_pairs, len(keys))
+    if pair_select == "worst":
+        pairs = _worst(D[iu], keys, max_pairs)
+    elif pair_select == "random":
+        sel = np.sort(np.random.default_rng(seed).choice(len(keys), n_keep,
+                                                         replace=False))
+        pairs = [keys[i] for i in sel]
+    elif pair_select == "spread":            # evenly spaced in lambda_real(q0)
+        order = np.argsort(lamR[iu])
+        pairs = [keys[i] for i in
+                 order[np.linspace(0, len(order) - 1, n_keep).astype(int)]]
+    else:
+        raise ValueError(f"pair_select must be worst/random/spread, got "
+                         f"{pair_select!r}")
 
     nrow, ncol = _grid(len(pairs))
     fig, axes = plt.subplots(nrow, ncol, figsize=(4.9 * ncol, 4.1 * nrow),
@@ -202,7 +233,7 @@ def tail_dependence_figure(real, gens, names, path, q_grid=None, tail="lower",
     _blank(axes, len(pairs))
     n_all = f * (f - 1) // 2
     shown = "" if max_pairs is None or n_all <= max_pairs else \
-        f" -- worst {len(pairs)} of {n_all} pairs"
+        f" -- {pair_select} {len(pairs)} of {n_all} pairs"
     fig.suptitle(rf"{tail.capitalize()} tail dependence $\hat\lambda(q)$ "
                  "per feature pair (plateau > 0 = co-crash, decay to 0 = tail "
                  f"independence){shown}")
@@ -287,14 +318,16 @@ def empirical_distribution_figure(real, gens, names, path,
 # ------------------------------------------------------------------ driver
 def save_all_figures(real, gens, names, outdir, weights=None, horizon=10,
                      prefix: str = "",
-                     max_pairs: int | None = MAX_PAIRS) -> list[str]:
+                     max_pairs: int | None = MAX_PAIRS,
+                     pair_select: str = "worst", seed: int = 0) -> list[str]:
     """Write the four diagnostic PNGs into `outdir`; return the paths written."""
     os.makedirs(outdir, exist_ok=True)
     p = lambda stem: os.path.join(outdir, f"{prefix}{stem}.png")
     paths = [
         qq_figure(real, gens, names, p("qq_lower_tail")),
         tail_dependence_figure(real, gens, names, p("tail_dependence"),
-                               max_pairs=max_pairs),
+                               max_pairs=max_pairs, pair_select=pair_select,
+                               seed=seed),
         portfolio_survival_figure(real, gens, p("portfolio_loss_survival"),
                                   weights=weights, horizon=horizon),
         empirical_distribution_figure(real, gens, names,
