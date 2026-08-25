@@ -64,6 +64,8 @@ def parse_args():
     ap.add_argument("--log", type=str, default=None,
                     help="text file receiving a copy of everything printed "
                          "(default: {outdir}/report.log)")
+    ap.add_argument("--pair-select", default="spread",
+                    choices=["worst", "random", "spread"])
     # ---- model selection ----------------------------------------------------
     ap.add_argument("--models", type=str, default="timevae,timegan,tailgan",
                     help="comma-separated subset of: timevae,timegan,tailgan")
@@ -220,7 +222,8 @@ def run(args):
     # ----------------------------------------------------------------- figures
     # One PNG per diagnostic (all models overlaid inside each), see figures.py.
     paths = save_all_figures(real, gens, names, args.outdir, weights=w,
-                             horizon=args.horizon)
+                             horizon=args.horizon, pair_select=args.pair_select,
+                             seed=args.seed)
     print("\nSaved: " + f"{args.outdir}/gen_<model>.npy, "
           + ", ".join(os.path.basename(p) for p in paths))
 
